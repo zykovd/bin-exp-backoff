@@ -95,6 +95,7 @@ class AlgorithmEnum(Enum):
 
 
 class MultipleAccess:
+    _helping_interval = []
     _DEBUG = False
     DELAY = 'd'
     NUM_CLIENTS = 'N'
@@ -139,7 +140,7 @@ class MultipleAccess:
                                 legend=self.get_legend(algorithm, p_max, p_min, M))
 
     @logger
-    def simulate_system(self, algorithm, list_intense, list_M, list_p_max=[0.5], list_p_min=[0.3]):
+    def simulate_system(self, algorithm, list_intense, list_M, list_p_max=[0.9], list_p_min=[0.3]):
         cprint("simulate_system | Lambda: {} | M: {}".format(list_intense, list_M), "cyan")
         list_results = []
         for M in list_M:
@@ -159,139 +160,11 @@ class MultipleAccess:
                     p_max, p_min, res[self.DELAY]))
         return res
 
-    # def run_time_division(self, intense, M):
-    #     result = {self.DELAY: 0, self.NUM_CLIENTS: 0}
-    #     if intense == 1:
-    #         intense -= 0.01
-    #     result[self.NUM_CLIENTS] = intense * (2 - intense) / (2 * (1 - intense))
-    #
-    #     time, total_sends, total_delay = 0, 0, 0.0
-    #     list_is_message_ready = [False for _ in range(M)]
-    #     list_message_appear_time = [0 for _ in range(M)]
-    #     while time < self.total_time:
-    #         for i in range(M):
-    #             if list_is_message_ready[i] == False and random.random() <= (intense / M):
-    #                 list_is_message_ready[i] = True
-    #                 list_message_appear_time[i] = time + random.random()
-    #             elif list_is_message_ready[i] == True and time % M == i:
-    #                 total_sends += 1
-    #                 total_delay += (time + 1 - list_message_appear_time[i])
-    #                 list_message_appear_time[i] = 0
-    #                 list_is_message_ready[i] = False
-    #         time += 1
-    #     if total_sends != 0:
-    #         result[self.DELAY] = total_delay / total_sends
-    #     return result
-    #
-    # def run_request_access(self, intense, M, tau):
-    #     result = {self.DELAY: 0, self.NUM_CLIENTS: 0}
-    #     if intense == 1:
-    #         intense -= 0.01
-    #     result[self.NUM_CLIENTS] = intense * (2 - intense) / (2 * (1 - intense))
-    #
-    #     time, total_sends, total_delay = 0, 0, 0.0
-    #     list_is_message_ready = [False for _ in range(M)]
-    #     list_message_appear_time = [0 for _ in range(M)]
-    #     request_to = 0
-    #     while time < self.total_time:
-    #         is_send = 0
-    #         if list_is_message_ready[request_to]:
-    #             total_sends += 1
-    #             total_delay += (time + 1 - list_message_appear_time[request_to])
-    #             list_message_appear_time[request_to] = 0
-    #             list_is_message_ready[request_to] = False
-    #             is_send = 1
-    #         for i in range(M):
-    #             if i == request_to and is_send == 1:
-    #                 continue
-    #             elif list_is_message_ready[i] == False and random.random() <= (
-    #                     (tau + is_send) * intense / M):  # todo check probability
-    #                 list_is_message_ready[i] = True
-    #                 list_message_appear_time[i] = time + random.uniform(0, tau + is_send)
-    #         time += tau + is_send
-    #         request_to = (request_to + 1) % M
-    #     if total_sends != 0:
-    #         result[self.DELAY] = total_delay / total_sends
-    #     return result
-    #
-    # def run_aloha(self, intense, M, p, is_first_send=False):
-    #     result = {self.DELAY: 0, self.NUM_CLIENTS: 0}
-    #     if intense == 1:
-    #         intense -= 0.01
-    #     result[self.NUM_CLIENTS] = intense * (2 - intense) / (2 * (1 - intense))
-    #
-    #     time, total_sends, total_delay = 0, 0, 0.0
-    #     list_is_message_ready = [False for _ in range(M)]
-    #     list_message_appear_time = [0 for _ in range(M)]
-    #     list_is_first_send = [is_first_send for _ in range(M)]
-    #     conflicts = 0
-    #     while time < self.total_time:
-    #         sends = 0  # 0 - Nothing; 1 - Success; 2 >= Conflict
-    #         list_is_sending = [False for _ in range(M)]
-    #         for i in range(M):
-    #             if list_is_message_ready[i] == False and random.random() <= (intense / M):
-    #                 list_is_message_ready[i] = True
-    #                 list_message_appear_time[i] = time + random.random()
-    #             elif list_is_message_ready[i] == True and list_is_first_send[i] or \
-    #                     list_is_message_ready[i] == True and random.random() <= p:
-    #                 sends += 1
-    #                 list_is_sending[i] = True
-    #                 list_is_first_send[i] = False
-    #         if sends == 1:
-    #             total_sends += 1
-    #             idx = list_is_sending.index(True)
-    #             total_delay += (time + 1 - list_message_appear_time[idx])
-    #             # list_message_appear_time[idx] = 0
-    #             list_is_message_ready[idx] = False
-    #         if sends >= 2:
-    #             conflicts += 1
-    #         time += 1
-    #     if total_sends != 0:
-    #         result[self.DELAY] = total_delay / total_sends
-    #     return result
-    #
-    # def run_aloha_interval(self, intense, M, p, interval_border, is_first_send=False):
-    #     result = {self.DELAY: 0, self.NUM_CLIENTS: 0}
-    #     if intense == 1:
-    #         intense -= 0.01
-    #     result[self.NUM_CLIENTS] = intense * (2 - intense) / (2 * (1 - intense))
-    #
-    #     time, total_sends, total_delay = 0, 0, 0.0
-    #     list_is_message_ready = [False for _ in range(M)]
-    #     list_estimated_send_time = [0 for _ in range(M)]
-    #     list_message_appear_time = [0 for _ in range(M)]
-    #     conflicts = 0
-    #     while time < self.total_time:
-    #         sends = 0  # 0 - Nothing; 1 - Success; 2 >= Conflict
-    #         list_is_sending = [False for _ in range(M)]
-    #         for i in range(M):
-    #             if list_is_message_ready[i] == False and random.random() <= (intense / M):
-    #                 list_is_message_ready[i] = True
-    #                 list_message_appear_time[i] = time + random.random()
-    #                 list_estimated_send_time[i] = time + random.randrange(1, interval_border)
-    #             elif list_is_message_ready[i] == True and is_first_send and list_message_appear_time[i] == 0 or \
-    #                     list_is_message_ready[i] == True and math.floor(  # todo random?
-    #                     list_message_appear_time[i]) + list_estimated_send_time[i] == time:
-    #                 sends += 1
-    #                 list_is_sending[i] = True
-    #         if sends == 1:
-    #             total_sends += 1
-    #             idx = list_is_sending.index(True)
-    #             total_delay += (time + 1 - list_message_appear_time[idx])
-    #             # list_message_appear_time[idx] = 0
-    #             list_is_message_ready[idx] = False
-    #         if sends >= 2:
-    #             conflicts += 1
-    #         time += 1
-    #     if total_sends != 0:
-    #         result[self.DELAY] = total_delay / total_sends
-    #     return result
-
     def run_bin_exp(self, intense, M, p_max, p_min):
         result = {self.DELAY: 0, self.NUM_CLIENTS: 0}
-        if intense == 1:
-            intense -= 0.01
-        result[self.NUM_CLIENTS] = intense * (2 - intense) / (2 * (1 - intense))
+        # if intense == 1:
+        #     intense -= 0.01
+        # result[self.NUM_CLIENTS] = intense * (2 - intense) / (2 * (1 - intense))
 
         appear_time = self.generate_intervals(intense, M)
 
@@ -328,6 +201,7 @@ class MultipleAccess:
 
         if total_sends != 0:
             result[self.DELAY] = total_delay / total_sends
+        result[self.NUM_CLIENTS] = total_sends / time
         return result
 
     def generate_intervals(self, intense, M=1):
@@ -338,7 +212,30 @@ class MultipleAccess:
             client = random.randrange(0, M)
             appear_time[client].append(float(time))
         return appear_time
-        # return queue, owner
+
+    def generate_num_of_events(self, intense, M=1):
+        rand = random.uniform(0, 1)
+        num_of_events = -1
+        for i in range(len(self._helping_interval)):
+            if i == 0:
+                if rand < self._helping_interval[i]:
+                    num_of_events = 0
+            else:
+                if self._helping_interval[i - 1] < rand <= self._helping_interval[i]:
+                    num_of_events = i
+        if num_of_events == -1:
+            num_of_events = len(self._helping_interval)
+        return num_of_events
+
+    def generate_helping_interval(self, intense, epsilon=10e-7):
+        self._helping_interval = []
+        cur_interval = 1
+        num_of_events = 0
+        while cur_interval > epsilon:
+            cur_interval = math.exp(-intense) * math.pow(intense, num_of_events) / math.factorial(num_of_events)
+            self._helping_interval.append(cur_interval)
+            num_of_events += 1
+        self._helping_interval = np.cumsum(self._helping_interval)
 
     @staticmethod
     def plot_results(list_results, title=''):
@@ -353,7 +250,8 @@ class MultipleAccess:
             ax1.plot(result.list_intense, result.list_clients)
             ax2.plot(result.list_intense, result.list_delay)
             list_legend.append(result.legend)
-        ax1.set_xlim(0, 1)
+        ax1.set_xlim(0, 1.25)
+        ax2.set_xlim(0, 1.25)
         ax2.set_ylim(0, 20)
         ax1.legend(list_legend)
         ax2.legend(list_legend)
@@ -363,10 +261,21 @@ class MultipleAccess:
 if __name__ == '__main__':
     simulation = MultipleAccess(total_time=100000, num_messages=100000, debug=True)
 
-    # list_lambda = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    list_lambda = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     # list_lambda = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45,
     #                0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1]
-    list_lambda = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+    # list_lambda = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+    # list_med_evets = []
+    # for l in list_lambda:
+    #     simulation.generate_helping_interval(intense=l)
+    #     s = 0
+    #     for i in range(1000):
+    #         s += simulation.generate_num_of_events(intense=l, M=2)
+    #     s = s / 1000
+    #     list_med_evets.append(s)
+    # fig, (ax1, ax2) = plt.subplots(1, 2)
+    # ax1.plot(list_lambda, list_med_evets)
+    # plt.show()
 
     list_M = [2]
     list_p_max = [1, 0.8]
@@ -392,5 +301,5 @@ if __name__ == '__main__':
         simulation.simulate_system(algorithm=AlgorithmEnum.BINARY_EXP, list_intense=list_lambda, list_M=list_M,
                                    list_p_max=list_p_max, list_p_min=list_p_min))
 
-    MultipleAccess.plot_results(list_results, "Binary Exp algorithm")
+    fig = MultipleAccess.plot_results(list_results, "Bin Exp algorithm")
     plt.show()
