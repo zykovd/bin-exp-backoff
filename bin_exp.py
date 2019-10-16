@@ -30,9 +30,13 @@ class SimulationResult:
     _interval_border = None
     _is_first_send = None
     _M = None
+    _param1 = None
+    _param2 = None
+    _param3 = None
+    _param4 = None
 
     def __init__(self, algorithm, list_intense, list_delay, list_clients, legend=None, p_max=None, p_min=None, tau=None,
-                 interval_border=None, is_first_send=None, M=None):
+                 interval_border=None, is_first_send=None, M=None, param1=None, param2=None, param3=None, param4=None):
         self._algorithm = algorithm
         self._list_intense = list_intense
         self._list_delay = list_delay
@@ -44,6 +48,10 @@ class SimulationResult:
         self._interval_border = interval_border
         self._is_first_send = is_first_send
         self._M = M
+        self._param1 = param1
+        self._param2 = param2
+        self._param3 = param3
+        self._param4 = param4
 
     @property
     def algorithm(self):
@@ -89,6 +97,22 @@ class SimulationResult:
     def M(self):
         return self._M
 
+    @property
+    def param1(self):
+        return self._param1
+
+    @property
+    def param2(self):
+        return self._param2
+
+    @property
+    def param3(self):
+        return self._param3
+
+    @property
+    def param4(self):
+        return self._param4
+
 
 class AlgorithmEnum(Enum):
     BINARY_EXP = 1
@@ -99,6 +123,10 @@ class MultipleAccess:
     _DEBUG = False
     DELAY = 'd'
     NUM_CLIENTS = 'N'
+    PARAM1 = 'p1'
+    PARAM2 = 'p2'
+    PARAM3 = 'p3'
+    PARAM4 = 'p4'
     """
     Implementation of multiple access algorithms.
     """
@@ -130,14 +158,20 @@ class MultipleAccess:
 
     def _simulate(self, list_intense, algorithm, p_max, p_min, M):
         list_clients, list_delay = [], []
+        list_p1, list_p2, list_p3, list_p4 = [], [], [], []
         for intense in list_intense:
             res = self.run(algorithm, intense, M, p_max, p_min)
             list_delay.append(res[self.DELAY])
             list_clients.append(res[self.NUM_CLIENTS])
+            list_p1.append(res[self.PARAM1])
+            list_p2.append(res[self.PARAM2])
+            list_p3.append(res[self.PARAM3])
+            list_p4.append(res[self.PARAM4])
         return SimulationResult(algorithm=algorithm, list_intense=list_intense, list_delay=list_delay,
                                 list_clients=list_clients,
                                 p_min=p_min, p_max=p_max, M=M,
-                                legend=self.get_legend(algorithm, p_max, p_min, M))
+                                legend=self.get_legend(algorithm, p_max, p_min, M),
+                                param1=list_p1, param2=list_p2, param3=list_p3, param4=list_p4)
 
     @logger
     def simulate_system(self, algorithm, list_intense, list_M, list_p_max=[0.9], list_p_min=[0.3]):
@@ -161,12 +195,12 @@ class MultipleAccess:
         return res
 
     def run_bin_exp(self, intense, M, p_max, p_min):
-        result = {self.DELAY: 0, self.NUM_CLIENTS: 0}
+        result = {self.DELAY: 0, self.NUM_CLIENTS: 0, self.PARAM1: 0, self.PARAM2: 0, self.PARAM3: 0, self.PARAM4: 0}
         # self.generate_helping_interval(intense=intense)
-        self.generate_helping_interval(intense=intense/M)
+        self.generate_helping_interval(intense=intense / M)
         # print(self._helping_interval)
 
-        time, total_sends, total_delay = 0, 0, 0.0
+        time, total_sends, total_delay, clients = 0, 0, 0.0, 0
         message_ready = [False for _ in range(M)]
         appear_time = [[] for _ in range(M)]
         probs = [1 for _ in range(M)]
@@ -179,11 +213,13 @@ class MultipleAccess:
             for i in range(M):
                 if message_ready[i] and random.random() <= probs[i]:
                     is_sending[i] = True
-            if is_sending.count(True) > 1:
+            cur_clients = is_sending.count(True)
+            clients += cur_clients
+            if cur_clients > 1:
                 for i in range(M):
                     if is_sending[i]:
                         probs[i] = max(probs[i] / 2, p_min)
-            elif is_sending.count(True) == 1:
+            elif cur_clients == 1:
                 idx = is_sending.index(True)
                 probs[idx] = p_max
                 total_sends += 1
@@ -194,12 +230,12 @@ class MultipleAccess:
             for i in range(M):
                 if len(appear_time[i]) == 0:
                     message_ready[i] = False
-                num_of_messages = self.generate_num_of_events(intense=intense/M)
+                num_of_messages = self.generate_num_of_events(intense=intense / M)
                 total_messages += num_of_messages
-            # senders_idx = [random.randint(0, M-1) for _ in range(num_of_messages)]
-            # for idx in senders_idx:
-            #     appear_time[idx].append(time + random.random())
-            #     message_ready[idx] = True
+                # senders_idx = [random.randint(0, M-1) for _ in range(num_of_messages)]
+                # for idx in senders_idx:
+                #     appear_time[idx].append(time + random.random())
+                #     message_ready[idx] = True
                 for _ in range(num_of_messages):
                     appear_time[i].append(time + random.random())
                     message_ready[i] = True
@@ -220,11 +256,12 @@ class MultipleAccess:
 
         if self._DEBUG:
             cprint('Remaining messages in queue =  {}'.format(sum([len(x) for x in appear_time])), 'red')
-            cprint('Generated messages / Time = {}'.format(total_messages/self.total_time), 'red')
+            cprint('Generated messages / Time = {}'.format(total_messages / self.total_time), 'red')
 
         if total_sends != 0:
             result[self.DELAY] = total_delay / total_sends
-        result[self.NUM_CLIENTS] = total_sends / time
+        result[self.NUM_CLIENTS] = clients / time
+        result[self.PARAM1] = total_sends / time
         return result
 
     def _run_bin_exp(self, intense, M, p_max, p_min):
