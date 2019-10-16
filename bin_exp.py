@@ -155,16 +155,80 @@ class MultipleAccess:
         if algorithm == AlgorithmEnum.BINARY_EXP:
             res = self.run_bin_exp(intense, M, p_max, p_min)
             if self._DEBUG:
-                print("{} | Lambda {} | M {} | p_max {} | p_min {} | d = {}".format(
+                print("{} | Lambda {} | M {} | p_max {} | p_min {} | d = {}\n".format(
                     self.get_alg_name(algorithm), intense, M,
                     p_max, p_min, res[self.DELAY]))
         return res
 
     def run_bin_exp(self, intense, M, p_max, p_min):
         result = {self.DELAY: 0, self.NUM_CLIENTS: 0}
-        # if intense == 1:
-        #     intense -= 0.01
-        # result[self.NUM_CLIENTS] = intense * (2 - intense) / (2 * (1 - intense))
+        # self.generate_helping_interval(intense=intense)
+        self.generate_helping_interval(intense=intense/M)
+        # print(self._helping_interval)
+
+        time, total_sends, total_delay = 0, 0, 0.0
+        message_ready = [False for _ in range(M)]
+        appear_time = [[] for _ in range(M)]
+        probs = [1 for _ in range(M)]
+
+        total_messages = 0
+
+        while time < self.total_time:
+
+            is_sending = [False for _ in range(M)]
+            for i in range(M):
+                if message_ready[i] and random.random() <= probs[i]:
+                    is_sending[i] = True
+            if is_sending.count(True) > 1:
+                for i in range(M):
+                    if is_sending[i]:
+                        probs[i] = max(probs[i] / 2, p_min)
+            elif is_sending.count(True) == 1:
+                idx = is_sending.index(True)
+                probs[idx] = p_max
+                total_sends += 1
+                delay = time + 1 - appear_time[idx].pop(0)
+                total_delay += delay
+                if len(appear_time[idx]) == 0:
+                    message_ready[idx] = False
+            for i in range(M):
+                if len(appear_time[i]) == 0:
+                    message_ready[i] = False
+                num_of_messages = self.generate_num_of_events(intense=intense/M)
+                total_messages += num_of_messages
+            # senders_idx = [random.randint(0, M-1) for _ in range(num_of_messages)]
+            # for idx in senders_idx:
+            #     appear_time[idx].append(time + random.random())
+            #     message_ready[idx] = True
+                for _ in range(num_of_messages):
+                    appear_time[i].append(time + random.random())
+                    message_ready[i] = True
+            # if num_of_messages > M:
+            #     num_of_messages = M
+            # ready_idx = random.sample(range(0, M), num_of_messages)
+            # # print(senders_idx)
+            # for idx in ready_idx:
+            #     message_ready[idx] = True
+            #     appear_time[idx].append(time + random.random())
+            time += 1
+
+        for i in range(M):
+            if len(appear_time[i]) > 0:
+                delay = time + 1 - appear_time[i].pop(0)
+                total_delay += delay
+                total_sends += 1
+
+        if self._DEBUG:
+            cprint('Remaining messages in queue =  {}'.format(sum([len(x) for x in appear_time])), 'red')
+            cprint('Generated messages / Time = {}'.format(total_messages/self.total_time), 'red')
+
+        if total_sends != 0:
+            result[self.DELAY] = total_delay / total_sends
+        result[self.NUM_CLIENTS] = total_sends / time
+        return result
+
+    def _run_bin_exp(self, intense, M, p_max, p_min):
+        result = {self.DELAY: 0, self.NUM_CLIENTS: 0}
 
         appear_time = self.generate_intervals(intense, M)
 
@@ -196,7 +260,7 @@ class MultipleAccess:
             for i in range(M):
                 if len(appear_time[i]) != 0:
                     is_break = False
-            if is_break:
+            if is_break or time > self.total_time:
                 break
 
         if total_sends != 0:
@@ -213,7 +277,7 @@ class MultipleAccess:
             appear_time[client].append(float(time))
         return appear_time
 
-    def generate_num_of_events(self, intense, M=1):
+    def generate_num_of_events(self, intense):
         rand = random.uniform(0, 1)
         num_of_events = -1
         for i in range(len(self._helping_interval)):
@@ -250,8 +314,8 @@ class MultipleAccess:
             ax1.plot(result.list_intense, result.list_clients)
             ax2.plot(result.list_intense, result.list_delay)
             list_legend.append(result.legend)
-        ax1.set_xlim(0, 1.25)
-        ax2.set_xlim(0, 1.25)
+        # ax1.set_xlim(0, 1.25)
+        # ax2.set_xlim(0, 1.25)
         ax2.set_ylim(0, 20)
         ax1.legend(list_legend)
         ax2.legend(list_legend)
@@ -261,42 +325,23 @@ class MultipleAccess:
 if __name__ == '__main__':
     simulation = MultipleAccess(total_time=100000, num_messages=100000, debug=True)
 
-    list_lambda = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    # list_lambda = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     # list_lambda = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45,
     #                0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1]
-    # list_lambda = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
-    # list_med_evets = []
-    # for l in list_lambda:
-    #     simulation.generate_helping_interval(intense=l)
-    #     s = 0
-    #     for i in range(1000):
-    #         s += simulation.generate_num_of_events(intense=l, M=2)
-    #     s = s / 1000
-    #     list_med_evets.append(s)
-    # fig, (ax1, ax2) = plt.subplots(1, 2)
-    # ax1.plot(list_lambda, list_med_evets)
-    # plt.show()
+    list_lambda = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
 
     list_M = [2]
+    # list_p_max = [1]
+    # list_p_min = [0.4]
+
     list_p_max = [1, 0.8]
-    list_p_min = [0.2, 0.4]
+    list_p_min = [0.2, 0.4, 0.8]
 
     list_results = []
 
     # TODO Интенсивность входного потока от выходного
     # Вариант 6 Двоичная экспоненциальная отсрочка
 
-    # list_results.extend(
-    #     simulation.simulate_system(algorithm=AlgorithmEnum.TIME_DIVISION, list_intense=list_lambda, list_M=list_M))
-    # list_results.extend(
-    #     simulation.simulate_system(algorithm=AlgorithmEnum.REQUEST_ACCESS, list_intense=list_lambda, list_M=list_M,
-    #                                list_tau=list_tau))
-    # list_results.extend(
-    #     simulation.simulate_system(algorithm=AlgorithmEnum.ALOHA, list_intense=list_lambda, list_M=list_M,
-    #                                list_p=list_p, is_first_send=False))
-    # list_results.extend(
-    #     simulation.simulate_system(algorithm=AlgorithmEnum.ALOHA, list_intense=list_lambda, list_M=list_M,
-    #                                list_p=list_p, is_first_send=True))
     list_results.extend(
         simulation.simulate_system(algorithm=AlgorithmEnum.BINARY_EXP, list_intense=list_lambda, list_M=list_M,
                                    list_p_max=list_p_max, list_p_min=list_p_min))
