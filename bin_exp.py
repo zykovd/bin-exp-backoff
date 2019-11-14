@@ -116,6 +116,8 @@ class SimulationResult:
 
 class AlgorithmEnum(Enum):
     BINARY_EXP = 1
+    ALOHA = 2
+    ADAPTIVE_ALOHA = 3
 
 
 class MultipleAccess:
@@ -145,6 +147,10 @@ class MultipleAccess:
         """
         if algorithm == AlgorithmEnum.BINARY_EXP:
             return "BinExp"
+        if algorithm == AlgorithmEnum.ALOHA:
+            return "Aloha"
+        if algorithm == AlgorithmEnum.ADAPTIVE_ALOHA:
+            return "AdaptiveAloha"
 
     def get_alg_name_list(self, list_algorithms):
         alg_name_list = []
@@ -155,6 +161,10 @@ class MultipleAccess:
     def get_legend(self, algorithm, p_max=1, p_min=0.5, M=1):
         if algorithm == AlgorithmEnum.BINARY_EXP:
             return "{} | p_max = {} | p_min = {} | M = {}".format(self.get_alg_name(algorithm), p_max, p_min, M)
+        if algorithm == AlgorithmEnum.ALOHA:
+            return "{} | p = {} | M = {}".format(self.get_alg_name(algorithm), p_max, M)
+        if algorithm == AlgorithmEnum.ADAPTIVE_ALOHA:
+            return "{} | p = {} | M = {}".format(self.get_alg_name(algorithm), p_max, M)
 
     def _simulate(self, list_intense, algorithm, p_max, p_min, M):
         list_clients, list_delay = [], []
@@ -192,7 +202,128 @@ class MultipleAccess:
                 print("{} | Lambda {} | M {} | p_max {} | p_min {} | d = {}\n".format(
                     self.get_alg_name(algorithm), intense, M,
                     p_max, p_min, res[self.DELAY]))
+        elif algorithm == AlgorithmEnum.ALOHA:
+            res = self.run_aloha(intense, M, p_max)
+            if self._DEBUG:
+                print("{} | Lambda {} | M {} | p {} | d = {}\n".format(
+                    self.get_alg_name(algorithm), intense, M,
+                    p_max, res[self.DELAY]))
+        elif algorithm == AlgorithmEnum.ADAPTIVE_ALOHA:
+            res = self.run_adaptive_aloha(intense, M, p_max)
+            if self._DEBUG:
+                print("{} | Lambda {} | M {} | p {} | d = {}\n".format(
+                    self.get_alg_name(algorithm), intense, M,
+                    p_max, res[self.DELAY]))
         return res
+
+    def run_adaptive_aloha(self, intense, M, p_max):
+        result = {self.DELAY: 0, self.NUM_CLIENTS: 0, self.PARAM1: 0, self.PARAM2: 0, self.PARAM3: 0, self.PARAM4: 0}
+        # self.generate_helping_interval(intense=intense)
+        self.generate_helping_interval(intense=intense / M)
+        # print(self._helping_interval)
+
+        time, total_sends, total_delay, clients = 0, 0, 0.0, 0
+        message_ready = [False for _ in range(M)]
+        appear_time = [[] for _ in range(M)]
+        cur_prob = p_max
+
+        total_messages = 0
+        while time < self.total_time:
+            is_sending = [False for _ in range(M)]
+            for i in range(M):
+                if message_ready[i] and random.random() <= cur_prob:
+                    is_sending[i] = True
+            cur_clients = is_sending.count(True)
+            clients += cur_clients
+            if cur_clients > 1:
+                cur_prob = max(1 / M, cur_prob / 2)
+            elif cur_clients == 0:
+                cur_prob = min(1, 2 * cur_prob)
+            elif cur_clients == 1:
+                idx = is_sending.index(True)
+                total_sends += 1
+                delay = time + 1 - appear_time[idx].pop(0)
+                total_delay += delay
+                if len(appear_time[idx]) == 0:
+                    message_ready[idx] = False
+            for i in range(M):
+                if len(appear_time[i]) == 0:
+                    message_ready[i] = False
+                num_of_messages = self.generate_num_of_events(intense=intense / M)
+                total_messages += num_of_messages
+                for _ in range(num_of_messages):
+                    appear_time[i].append(time + random.random())
+                    message_ready[i] = True
+            time += 1
+
+        for i in range(M):
+            if len(appear_time[i]) > 0:
+                delay = time + 1 - appear_time[i].pop(0)
+                total_delay += delay
+                total_sends += 1
+
+        if self._DEBUG:
+            cprint('Remaining messages in queue =  {}'.format(sum([len(x) for x in appear_time])), 'red')
+            cprint('Generated messages / Time = {}'.format(total_messages / self.total_time), 'red')
+
+        if total_sends != 0:
+            result[self.DELAY] = total_delay / total_sends
+        result[self.NUM_CLIENTS] = clients / time
+        result[self.PARAM1] = total_sends / time
+        return result
+
+    def run_aloha(self, intense, M, p_max):
+        result = {self.DELAY: 0, self.NUM_CLIENTS: 0, self.PARAM1: 0, self.PARAM2: 0, self.PARAM3: 0, self.PARAM4: 0}
+        # self.generate_helping_interval(intense=intense)
+        self.generate_helping_interval(intense=intense / M)
+        # print(self._helping_interval)
+
+        time, total_sends, total_delay, clients = 0, 0, 0.0, 0
+        message_ready = [False for _ in range(M)]
+        appear_time = [[] for _ in range(M)]
+
+        total_messages = 0
+
+        while time < self.total_time:
+
+            is_sending = [False for _ in range(M)]
+            for i in range(M):
+                if message_ready[i] and random.random() <= p_max:
+                    is_sending[i] = True
+            cur_clients = is_sending.count(True)
+            clients += cur_clients
+            if cur_clients == 1:
+                idx = is_sending.index(True)
+                total_sends += 1
+                delay = time + 1 - appear_time[idx].pop(0)
+                total_delay += delay
+                if len(appear_time[idx]) == 0:
+                    message_ready[idx] = False
+            for i in range(M):
+                if len(appear_time[i]) == 0:
+                    message_ready[i] = False
+                num_of_messages = self.generate_num_of_events(intense=intense / M)
+                total_messages += num_of_messages
+                for _ in range(num_of_messages):
+                    appear_time[i].append(time + random.random())
+                    message_ready[i] = True
+            time += 1
+
+        for i in range(M):
+            if len(appear_time[i]) > 0:
+                delay = time + 1 - appear_time[i].pop(0)
+                total_delay += delay
+                total_sends += 1
+
+        if self._DEBUG:
+            cprint('Remaining messages in queue =  {}'.format(sum([len(x) for x in appear_time])), 'red')
+            cprint('Generated messages / Time = {}'.format(total_messages / self.total_time), 'red')
+
+        if total_sends != 0:
+            result[self.DELAY] = total_delay / total_sends
+        result[self.NUM_CLIENTS] = clients / time
+        result[self.PARAM1] = total_sends / time
+        return result
 
     def run_bin_exp(self, intense, M, p_max, p_min):
         result = {self.DELAY: 0, self.NUM_CLIENTS: 0, self.PARAM1: 0, self.PARAM2: 0, self.PARAM3: 0, self.PARAM4: 0}
@@ -340,16 +471,19 @@ class MultipleAccess:
 
     @staticmethod
     def plot_results(list_results, title=''):
-        fig, (ax1, ax2) = plt.subplots(1, 2)
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
         plt.suptitle(title)
         ax1.set_xlabel('Lambda')
         ax1.set_ylabel('N')
         ax2.set_xlabel('Lambda')
         ax2.set_ylabel('d')
+        ax3.set_xlabel('Lambda')
+        ax3.set_ylabel('In/Out')
         list_legend = []
         for result in list_results:
             ax1.plot(result.list_intense, result.list_clients)
             ax2.plot(result.list_intense, result.list_delay)
+            ax3.plot(result.list_intense, result.param1)
             list_legend.append(result.legend)
         # ax1.set_xlim(0, 1.25)
         # ax2.set_xlim(0, 1.25)
@@ -374,14 +508,19 @@ if __name__ == '__main__':
     list_p_max = [1, 0.8]
     list_p_min = [0.2, 0.4, 0.8]
 
+    list_p = [0.5, 0.6]
+
     list_results = []
 
     # TODO Интенсивность входного потока от выходного
     # Вариант 6 Двоичная экспоненциальная отсрочка
 
     list_results.extend(
-        simulation.simulate_system(algorithm=AlgorithmEnum.BINARY_EXP, list_intense=list_lambda, list_M=list_M,
-                                   list_p_max=list_p_max, list_p_min=list_p_min))
+        simulation.simulate_system(algorithm=AlgorithmEnum.ALOHA, list_intense=list_lambda, list_M=list_M,
+                                   list_p_max=list_p))
+    list_results.extend(
+        simulation.simulate_system(algorithm=AlgorithmEnum.ADAPTIVE_ALOHA, list_intense=list_lambda, list_M=list_M,
+                                   list_p_max=list_p))
 
-    fig = MultipleAccess.plot_results(list_results, "Bin Exp algorithm")
+    fig = MultipleAccess.plot_results(list_results, "Results")
     plt.show()
