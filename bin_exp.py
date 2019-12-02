@@ -194,6 +194,108 @@ class MultipleAccess:
                     list_results.append(res)
         return list_results
 
+    @logger
+    def simulate_channel_capture(self, intense=0.85, M=4, p_max=1, p_min=0.015625):
+        cprint("simulate_system | Lambda: {} | M: {}".format(intense, M), "cyan")
+        _, list_results = self.run_channel_capture(intense, M, p_max, p_min)
+        return list_results
+
+    def run_channel_capture(self, intense, M, p_max, p_min):
+        list_results = [[] for _ in range(M + 1)]
+        result = {self.DELAY: 0, self.NUM_CLIENTS: 0, self.PARAM1: 0, self.PARAM2: 0, self.PARAM3: 0, self.PARAM4: 0}
+        self.generate_helping_interval(intense=intense / M)
+
+        _p_max = _p_min = 1 / M
+
+        time, total_sends, total_delay, clients = 0, 0, 0.0, 0
+        message_ready = [False for _ in range(M)]
+        appear_time = [[] for _ in range(M)]
+        probs = [p_max for _ in range(M)]
+
+        init_num_of_messages = 50
+        for i in range(M):
+            for _ in range(init_num_of_messages):
+                appear_time[i].append(random.random())
+                message_ready[i] = True
+
+        total_messages = 0
+        channel_capture = False
+
+        while time < self.total_time:
+
+            is_sending = [False for _ in range(M)]
+            for i in range(M):
+                if message_ready[i] and random.random() <= probs[i]:
+                    is_sending[i] = True
+            cur_clients = is_sending.count(True)
+            clients += cur_clients
+            if cur_clients > 1:
+                if not channel_capture:
+                    for i in range(M):
+                        if is_sending[i]:
+                            probs[i] = max(probs[i] / 2, _p_min)
+                else:
+                    for i in range(M - 1):
+                        if is_sending[i]:
+                            probs[i] = max(probs[i] / 2, p_min)
+
+            elif cur_clients == 1:
+                idx = is_sending.index(True)
+                if not channel_capture:
+                    probs[idx] = _p_max
+                else:
+                    probs[idx] = p_max
+                total_sends += 1
+                delay = time + 1 - appear_time[idx].pop(0)
+                total_delay += delay
+                if len(appear_time[idx]) == 0:
+                    message_ready[idx] = False
+            for i in range(M):
+                if len(appear_time[i]) == 0:
+                    message_ready[i] = False
+                num_of_messages = self.generate_num_of_events(intense=intense / M)
+                total_messages += num_of_messages
+                for _ in range(num_of_messages):
+                    appear_time[i].append(time + random.random())
+                    message_ready[i] = True
+            time += 1
+
+            if time >= self.total_time // 100 and not channel_capture:
+                channel_capture = True
+                if self._DEBUG:
+                    cprint('Channel capture on time = {}'.format(time), 'red')
+                message_ready.append(True)
+                appear_time.append([time + random.random()])
+                probs.append(p_max)
+                M += 1
+                for _ in range(init_num_of_messages ** 2):
+                    appear_time[M - 1].append(random.random())
+                for i in range(M):
+                    list_results[i].append(probs[i])
+            elif time >= self.total_time // 100 and channel_capture:
+                for i in range(M):
+                    list_results[i].append(probs[i])
+            elif not channel_capture:
+                for i in range(M):
+                    list_results[i].append(probs[i])
+                list_results[M].append(0)
+
+        for i in range(M):
+            if len(appear_time[i]) > 0:
+                delay = time + 1 - appear_time[i].pop(0)
+                total_delay += delay
+                total_sends += 1
+
+        if self._DEBUG:
+            cprint('Remaining messages in queue =  {}'.format(sum([len(x) for x in appear_time])), 'red')
+            cprint('Generated messages / Time = {}'.format(total_messages / self.total_time), 'red')
+
+        if total_sends != 0:
+            result[self.DELAY] = total_delay / total_sends
+        result[self.NUM_CLIENTS] = clients / time
+        result[self.PARAM1] = total_sends / time
+        return result, list_results
+
     def run(self, algorithm, intense, M, p_max, p_min):
         res = {}
         if algorithm == AlgorithmEnum.BINARY_EXP:
@@ -334,7 +436,7 @@ class MultipleAccess:
         time, total_sends, total_delay, clients = 0, 0, 0.0, 0
         message_ready = [False for _ in range(M)]
         appear_time = [[] for _ in range(M)]
-        probs = [1 for _ in range(M)]
+        probs = [p_max for _ in range(M)]
 
         total_messages = 0
 
@@ -363,20 +465,9 @@ class MultipleAccess:
                     message_ready[i] = False
                 num_of_messages = self.generate_num_of_events(intense=intense / M)
                 total_messages += num_of_messages
-                # senders_idx = [random.randint(0, M-1) for _ in range(num_of_messages)]
-                # for idx in senders_idx:
-                #     appear_time[idx].append(time + random.random())
-                #     message_ready[idx] = True
                 for _ in range(num_of_messages):
                     appear_time[i].append(time + random.random())
                     message_ready[i] = True
-            # if num_of_messages > M:
-            #     num_of_messages = M
-            # ready_idx = random.sample(range(0, M), num_of_messages)
-            # # print(senders_idx)
-            # for idx in ready_idx:
-            #     message_ready[idx] = True
-            #     appear_time[idx].append(time + random.random())
             time += 1
 
         for i in range(M):
@@ -492,35 +583,36 @@ class MultipleAccess:
         ax2.legend(list_legend)
         return fig
 
+    @staticmethod
+    def plot_channel_capture(list_results, total_time, title=''):
+        fig, (ax1) = plt.subplots(1, 1)
+        plt.suptitle(title)
+        ax1.set_xlabel('Time')
+        ax1.set_ylabel('Probability')
+        for result in list_results:
+            ax1.plot([i for i in range(total_time)], result)
+        ax1.set_xlim(total_time // 100 - 400, total_time // 100 + 400)
+        # ax2.set_xlim(0, 1.25)
+        return fig
+
 
 if __name__ == '__main__':
-    simulation = MultipleAccess(total_time=100000, num_messages=100000, debug=True)
+    total_time = 100000
+    simulation = MultipleAccess(total_time=total_time, num_messages=100000, debug=True)
 
     # list_lambda = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     # list_lambda = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45,
     #                0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1]
     list_lambda = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
 
-    list_M = [2]
-    # list_p_max = [1]
-    # list_p_min = [0.4]
-
-    list_p_max = [1, 0.8]
-    list_p_min = [0.2, 0.4, 0.8]
-
-    list_p = [0.5, 0.6]
-
     list_results = []
 
     # TODO Интенсивность входного потока от выходного
-    # Вариант 6 Двоичная экспоненциальная отсрочка
+    # Вариант 6 Двоичная экспоненциальная отсрочка + Захват канала
 
     list_results.extend(
-        simulation.simulate_system(algorithm=AlgorithmEnum.ALOHA, list_intense=list_lambda, list_M=list_M,
-                                   list_p_max=list_p))
-    list_results.extend(
-        simulation.simulate_system(algorithm=AlgorithmEnum.ADAPTIVE_ALOHA, list_intense=list_lambda, list_M=list_M,
-                                   list_p_max=list_p))
+        simulation.simulate_channel_capture()
+    )
 
-    fig = MultipleAccess.plot_results(list_results, "Results")
+    fig = MultipleAccess.plot_channel_capture(list_results, total_time, "Channel capture")
     plt.show()
