@@ -118,6 +118,7 @@ class AlgorithmEnum(Enum):
     BINARY_EXP = 1
     ALOHA = 2
     ADAPTIVE_ALOHA = 3
+    INTERVAL_BINARY_EXP = 4
 
 
 class MultipleAccess:
@@ -151,6 +152,8 @@ class MultipleAccess:
             return "Aloha"
         if algorithm == AlgorithmEnum.ADAPTIVE_ALOHA:
             return "AdaptiveAloha"
+        if algorithm == AlgorithmEnum.INTERVAL_BINARY_EXP:
+            return "IntervalBinExp"
 
     def get_alg_name_list(self, list_algorithms):
         alg_name_list = []
@@ -158,19 +161,21 @@ class MultipleAccess:
             alg_name_list.append(self.get_alg_name(algorithm))
         return alg_name_list
 
-    def get_legend(self, algorithm, p_max=1, p_min=0.5, M=1):
+    def get_legend(self, algorithm, p_max=1, p_min=0.5, M=1, w_max=5, w_min=1):
         if algorithm == AlgorithmEnum.BINARY_EXP:
             return "{} | p_max = {} | p_min = {} | M = {}".format(self.get_alg_name(algorithm), p_max, p_min, M)
         if algorithm == AlgorithmEnum.ALOHA:
             return "{} | p = {} | M = {}".format(self.get_alg_name(algorithm), p_max, M)
         if algorithm == AlgorithmEnum.ADAPTIVE_ALOHA:
             return "{} | p = {} | M = {}".format(self.get_alg_name(algorithm), p_max, M)
+        if algorithm == AlgorithmEnum.INTERVAL_BINARY_EXP:
+            return "{} | W_max = {} | W_min = {} | M = {}".format(self.get_alg_name(algorithm), w_max, w_min, M)
 
-    def _simulate(self, list_intense, algorithm, p_max, p_min, M):
+    def _simulate(self, list_intense, algorithm, M, p_max=1, p_min=0.5, w_max=5, w_min=1):
         list_clients, list_delay = [], []
         list_p1, list_p2, list_p3, list_p4 = [], [], [], []
         for intense in list_intense:
-            res = self.run(algorithm, intense, M, p_max, p_min)
+            res = self.run(algorithm, intense, M, p_max, p_min, w_max, w_min)
             list_delay.append(res[self.DELAY])
             list_clients.append(res[self.NUM_CLIENTS])
             list_p1.append(res[self.PARAM1])
@@ -180,18 +185,28 @@ class MultipleAccess:
         return SimulationResult(algorithm=algorithm, list_intense=list_intense, list_delay=list_delay,
                                 list_clients=list_clients,
                                 p_min=p_min, p_max=p_max, M=M,
-                                legend=self.get_legend(algorithm, p_max, p_min, M),
+                                legend=self.get_legend(algorithm, p_max, p_min, M, w_max, w_min),
                                 param1=list_p1, param2=list_p2, param3=list_p3, param4=list_p4)
 
     @logger
-    def simulate_system(self, algorithm, list_intense, list_M, list_p_max=[0.9], list_p_min=[0.3]):
+    def simulate_system(self, algorithm, list_intense, list_M, list_p_max=[1], list_p_min=[0.5], list_w_max=[5],
+                        list_w_min=[1]):
         cprint("simulate_system | Lambda: {} | M: {}".format(list_intense, list_M), "cyan")
         list_results = []
-        for M in list_M:
-            for p_max in list_p_max:
-                for p_min in list_p_min:
-                    res = self._simulate(list_intense, algorithm, p_max, p_min, M)
-                    list_results.append(res)
+        if algorithm == AlgorithmEnum.INTERVAL_BINARY_EXP:
+            for M in list_M:
+                for w_max in list_w_max:
+                    for w_min in list_w_min:
+                        res = self._simulate(list_intense=list_intense, algorithm=algorithm, w_max=w_max, w_min=w_min,
+                                             M=M)
+                        list_results.append(res)
+        else:
+            for M in list_M:
+                for p_max in list_p_max:
+                    for p_min in list_p_min:
+                        res = self._simulate(list_intense=list_intense, algorithm=algorithm, p_max=p_max, p_min=p_min,
+                                             M=M)
+                        list_results.append(res)
         return list_results
 
     @logger
@@ -296,7 +311,7 @@ class MultipleAccess:
         result[self.PARAM1] = total_sends / time
         return result, list_results
 
-    def run(self, algorithm, intense, M, p_max, p_min):
+    def run(self, algorithm, intense, M, p_max, p_min, w_max, w_min):
         res = {}
         if algorithm == AlgorithmEnum.BINARY_EXP:
             res = self.run_bin_exp(intense, M, p_max, p_min)
@@ -304,18 +319,24 @@ class MultipleAccess:
                 print("{} | Lambda {} | M {} | p_max {} | p_min {} | d = {}\n".format(
                     self.get_alg_name(algorithm), intense, M,
                     p_max, p_min, res[self.DELAY]))
-        elif algorithm == AlgorithmEnum.ALOHA:
+        if algorithm == AlgorithmEnum.ALOHA:
             res = self.run_aloha(intense, M, p_max)
             if self._DEBUG:
                 print("{} | Lambda {} | M {} | p {} | d = {}\n".format(
                     self.get_alg_name(algorithm), intense, M,
                     p_max, res[self.DELAY]))
-        elif algorithm == AlgorithmEnum.ADAPTIVE_ALOHA:
+        if algorithm == AlgorithmEnum.ADAPTIVE_ALOHA:
             res = self.run_adaptive_aloha(intense, M, p_max)
             if self._DEBUG:
                 print("{} | Lambda {} | M {} | p {} | d = {}\n".format(
                     self.get_alg_name(algorithm), intense, M,
                     p_max, res[self.DELAY]))
+        if algorithm == AlgorithmEnum.INTERVAL_BINARY_EXP:
+            res = self.run_interval_bin_exp(intense, M, w_max, w_min)
+            if self._DEBUG:
+                print("{} | Lambda {} | M {} | W_max {} | W_min {} | d = {}\n".format(
+                    self.get_alg_name(algorithm), intense, M,
+                    w_max, w_min, res[self.DELAY]))
         return res
 
     def run_adaptive_aloha(self, intense, M, p_max):
@@ -486,6 +507,71 @@ class MultipleAccess:
         result[self.PARAM1] = total_sends / time
         return result
 
+    def run_interval_bin_exp(self, intense, M, w_max, w_min):
+        result = {self.DELAY: 0, self.NUM_CLIENTS: 0, self.PARAM1: 0, self.PARAM2: 0, self.PARAM3: 0, self.PARAM4: 0}
+        self.generate_helping_interval(intense=intense / M)
+
+        time, total_sends, total_delay, clients = 0, 0, 0.0, 0
+        message_ready = [False for _ in range(M)]
+        appear_time = [[] for _ in range(M)]
+        intervals = [0 for _ in range(M)]
+        intervals_border = [w_min for _ in range(M)]
+
+        total_messages = 0
+
+        while time < self.total_time:
+
+            is_sending = [False for _ in range(M)]
+            for i in range(M):
+                if message_ready[i] and intervals[i] == 0:
+                    is_sending[i] = True
+            cur_clients = is_sending.count(True)
+            clients += cur_clients
+            if cur_clients > 1:
+                for i in range(M):
+                    if is_sending[i]:
+                        intervals_border[i] = min(intervals_border[i] * 2, w_max)
+                        intervals[i] = random.randint(0, intervals_border[i])
+            elif cur_clients == 1:
+                idx = is_sending.index(True)
+                intervals_border[idx] = w_min
+                intervals[idx] = random.randint(0, intervals_border[idx])
+                total_sends += 1
+                delay = time + 1 - appear_time[idx].pop(0)
+                total_delay += delay
+                if len(appear_time[idx]) == 0:
+                    message_ready[idx] = False
+            for i in range(M):
+                if len(appear_time[i]) == 0:
+                    message_ready[i] = False
+                num_of_messages = self.generate_num_of_events(intense=intense / M)
+                # if num_of_messages != 0:
+                #     print('here')
+                total_messages += num_of_messages
+                for _ in range(num_of_messages):
+                    appear_time[i].append(time + random.random())
+                    message_ready[i] = True
+            time += 1
+            for i in range(M):
+                if intervals[i] > 0:
+                    intervals[i] -= 1
+
+        for i in range(M):
+            if len(appear_time[i]) > 0:
+                delay = time + 1 - appear_time[i].pop(0)
+                total_delay += delay
+                total_sends += 1
+
+        if self._DEBUG:
+            cprint('Remaining messages in queue =  {}'.format(sum([len(x) for x in appear_time])), 'red')
+            cprint('Generated messages / Time = {}'.format(total_messages / self.total_time), 'red')
+
+        if total_sends != 0:
+            result[self.DELAY] = total_delay / total_sends
+        result[self.NUM_CLIENTS] = clients / time
+        result[self.PARAM1] = total_sends / time
+        return result
+
     def _run_bin_exp(self, intense, M, p_max, p_min):
         result = {self.DELAY: 0, self.NUM_CLIENTS: 0}
 
@@ -581,6 +667,7 @@ class MultipleAccess:
         ax2.set_ylim(0, 20)
         ax1.legend(list_legend)
         ax2.legend(list_legend)
+        ax3.legend(list_legend)
         return fig
 
     @staticmethod
@@ -605,14 +692,20 @@ if __name__ == '__main__':
     #                0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1]
     list_lambda = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
 
+    list_M = [3]
+
+    list_w_max = [8, 10]
+    list_w_min = [1, 4]
+
     list_results = []
 
     # TODO Интенсивность входного потока от выходного
-    # Вариант 6 Двоичная экспоненциальная отсрочка + Захват канала
+    # Вариант 7 Двоичная экспоненциальная отсрочка (Интервальный вариант)
 
     list_results.extend(
-        simulation.simulate_channel_capture()
+        simulation.simulate_system(algorithm=AlgorithmEnum.INTERVAL_BINARY_EXP, list_intense=list_lambda, list_M=list_M,
+                                   list_w_max=list_w_max, list_w_min=list_w_min)
     )
 
-    fig = MultipleAccess.plot_channel_capture(list_results, total_time, "Channel capture")
+    fig = MultipleAccess.plot_results(list_results, "Binary exponential backoff")
     plt.show()
