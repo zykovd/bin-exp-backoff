@@ -692,19 +692,16 @@ if __name__ == '__main__':
     #                0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1]
     list_lambda = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
 
-    list_M = [3]
+    list_M = [2]
 
-    list_w_max = [8, 10]
-    list_w_min = [1, 4]
+    list_p_max = [1, 0.75]
+    list_p_min = [0.3, 0.5]
 
     list_results = []
 
-    # TODO Интенсивность входного потока от выходного
-    # Вариант 7 Двоичная экспоненциальная отсрочка (Интервальный вариант)
-
     list_results.extend(
-        simulation.simulate_system(algorithm=AlgorithmEnum.INTERVAL_BINARY_EXP, list_intense=list_lambda, list_M=list_M,
-                                   list_w_max=list_w_max, list_w_min=list_w_min)
+        simulation.simulate_system(algorithm=AlgorithmEnum.BINARY_EXP, list_intense=list_lambda, list_M=list_M,
+                                   list_p_max=list_p_max, list_p_min=list_p_min)
     )
 
     fig = MultipleAccess.plot_results(list_results, "Binary exponential backoff")
