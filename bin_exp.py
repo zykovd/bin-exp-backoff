@@ -718,17 +718,28 @@ class MultipleAccess:
 
 
 if __name__ == '__main__':
-    total_time = 100
-    num_messages = 100
+    total_time = 100000
+    num_messages = 100000
     simulation = MultipleAccess(total_time=total_time, num_messages=num_messages, debug=True)
 
     list_results = []
 
-    list_results.append(simulation.run_bin_exp_save_probs(intense=0.1, M=5, p_max=1, p_min=0.125))
-    list_results.append(simulation.run_bin_exp_save_probs(intense=0.3, M=5, p_max=1, p_min=0.125))
-    list_results.append(simulation.run_bin_exp_save_probs(intense=0.5, M=5, p_max=1, p_min=0.125))
-    list_results.append(simulation.run_bin_exp_save_probs(intense=0.8, M=5, p_max=1, p_min=0.125))
+    list_intense = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+    list_p_max = [1]
+    list_p_min = [0.125]
+    list_M = [5]
 
-    fig = MultipleAccess.plot_probs(list_results=list_results)
+    list_results.extend(simulation.simulate_system(algorithm=AlgorithmEnum.BINARY_EXP,
+                                                   list_intense=list_intense,
+                                                   list_M=list_M,
+                                                   list_p_max=list_p_max,
+                                                   list_p_min=list_p_min))
+    # list_results.append(simulation.run_bin_exp_save_probs(intense=0.1, M=5, p_max=1, p_min=0.125))
+    # list_results.append(simulation.run_bin_exp_save_probs(intense=0.3, M=5, p_max=1, p_min=0.125))
+    # list_results.append(simulation.run_bin_exp_save_probs(intense=0.5, M=5, p_max=1, p_min=0.125))
+    # list_results.append(simulation.run_bin_exp_save_probs(intense=0.8, M=5, p_max=1, p_min=0.125))
+    #
+    # fig = MultipleAccess.plot_probs(list_results=list_results)
+    MultipleAccess.plot_results(list_results=list_results)
 
     plt.show()
