@@ -696,6 +696,9 @@ class MultipleAccess:
             for i in range(result.M):
                 ax1.plot([t for t in range(len(result.param2[i]))], result.param2[i])
                 list_legend.append("client{}".format(i))
+            med = sum([sum(result.param2[i]) for i in range(result.M)]) / (result.M * len(result.param2[0]))
+            ax1.plot([t for t in range(len(result.param2[0]))], [med for _ in range(len(result.param2[0]))], '--')
+            list_legend.append("mean")
             # ax1.set_xlim(0, 1.25)
             # ax2.set_xlim(0, 1.25)
             ax1.legend(list_legend)
