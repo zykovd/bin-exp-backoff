@@ -540,7 +540,7 @@ class MultipleAccess:
         intervals_border = [w_min for _ in range(M)]
 
         if plot_w:
-            result[self.PARAM2] = [[intervals[i]] for i in range(M)]
+            result[self.PARAM2] = [[intervals_border[i]] for i in range(M)]
 
         total_messages = 0
 
@@ -577,7 +577,7 @@ class MultipleAccess:
                     appear_time[i].append(time + random.random())
                     message_ready[i] = True
                 if plot_w:
-                    result[self.PARAM2][i].append(intervals[i])
+                    result[self.PARAM2][i].append(intervals_border[i])
             time += 1
             for i in range(M):
                 if intervals[i] > 0:
@@ -777,10 +777,10 @@ if __name__ == '__main__':
     #
     # MultipleAccess.plot_w(list_results)
 
-    list_results.append(simulation.run_bin_exp_interval_save_probs(intense=0.1, M=5, w_max=8, w_min=1))
-    list_results.append(simulation.run_bin_exp_interval_save_probs(intense=0.3, M=5, w_max=8, w_min=1))
-    list_results.append(simulation.run_bin_exp_interval_save_probs(intense=0.5, M=5, w_max=8, w_min=1))
-    list_results.append(simulation.run_bin_exp_interval_save_probs(intense=0.8, M=5, w_max=8, w_min=1))
+    list_results.append(simulation.run_bin_exp_interval_save_probs(intense=0.1, M=5, w_max=1000, w_min=1))
+    list_results.append(simulation.run_bin_exp_interval_save_probs(intense=0.3, M=5, w_max=1000, w_min=1))
+    list_results.append(simulation.run_bin_exp_interval_save_probs(intense=0.5, M=5, w_max=1000, w_min=1))
+    list_results.append(simulation.run_bin_exp_interval_save_probs(intense=0.8, M=5, w_max=1000, w_min=1))
 
     fig = MultipleAccess.plot_w(list_results=list_results)
 
