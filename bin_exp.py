@@ -735,7 +735,7 @@ class MultipleAccess:
             ax1.plot([t for t in range(len(result.param2[0]))], [med for _ in range(len(result.param2[0]))], '--')
             list_legend.append("mean")
             ax1.set_ylim(1, med+3)
-            # ax2.set_xlim(0, 1.25)
+            ax1.set_xlim(0, 1000)
             ax1.legend(list_legend)
         return fig
 
@@ -753,29 +753,31 @@ class MultipleAccess:
 
 
 if __name__ == '__main__':
-    total_time = 1000
-    simulation = MultipleAccess(total_time=total_time, num_messages=1000, debug=True)
+    total_time = 100000
+    simulation = MultipleAccess(total_time=total_time, num_messages=100000, debug=True)
 
     # list_lambda = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     # list_lambda = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45,
     #                0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1]
-    # list_lambda = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
-    #
-    # list_M = [3]
-    #
-    # list_w_max = [8]
-    # list_w_min = [1]
+    list_lambda = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+
+    list_M = [5]
+
+    list_w_max = [8, 1000]
+    list_w_min = [1]
 
     list_results = []
 
     # Вариант 7 Двоичная экспоненциальная отсрочка (Интервальный вариант)
 
-    # list_results.extend(
-    #     simulation.simulate_system(algorithm=AlgorithmEnum.INTERVAL_BINARY_EXP, list_intense=list_lambda, list_M=list_M,
-    #                                list_w_max=list_w_max, list_w_min=list_w_min)
-    # )
-    #
-    # MultipleAccess.plot_w(list_results)
+    list_results.extend(
+        simulation.simulate_system(algorithm=AlgorithmEnum.INTERVAL_BINARY_EXP, list_intense=list_lambda, list_M=list_M,
+                                   list_w_max=list_w_max, list_w_min=list_w_min)
+    )
+
+    MultipleAccess.plot_results(list_results)
+
+    list_results = []
 
     list_results.append(simulation.run_bin_exp_interval_save_probs(intense=0.1, M=5, w_max=1000, w_min=1))
     list_results.append(simulation.run_bin_exp_interval_save_probs(intense=0.3, M=5, w_max=1000, w_min=1))
