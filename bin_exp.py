@@ -219,6 +219,15 @@ class MultipleAccess:
         return result
 
     @logger
+    def run_bin_exp_interval_save_probs(self, intense=0.85, M=4, w_max=10, w_min=4):
+        cprint("run_bin_exp_interval_save_probs | Lambda: {} | M: {}".format(intense, M), "cyan")
+        temp_res = self.run_interval_bin_exp(intense, M, w_max, w_min, True)
+        result = SimulationResult(algorithm=AlgorithmEnum.INTERVAL_BINARY_EXP, list_intense=[intense],
+                                  list_clients=temp_res[self.NUM_CLIENTS], list_delay=temp_res[self.DELAY],
+                                  param2=temp_res[self.PARAM2], p_max=w_max, p_min=w_min, M=M)
+        return result
+
+    @logger
     def simulate_channel_capture(self, intense=0.85, M=4, p_max=1, p_min=0.015625):
         cprint("simulate_system | Lambda: {} | M: {}".format(intense, M), "cyan")
         _, list_results = self.run_channel_capture(intense, M, p_max, p_min)
@@ -520,7 +529,7 @@ class MultipleAccess:
         result[self.PARAM1] = total_sends / time
         return result
 
-    def run_interval_bin_exp(self, intense, M, w_max, w_min):
+    def run_interval_bin_exp(self, intense, M, w_max, w_min, plot_w=False):
         result = {self.DELAY: 0, self.NUM_CLIENTS: 0, self.PARAM1: 0, self.PARAM2: 0, self.PARAM3: 0, self.PARAM4: 0}
         self.generate_helping_interval(intense=intense / M)
 
@@ -529,6 +538,9 @@ class MultipleAccess:
         appear_time = [[] for _ in range(M)]
         intervals = [0 for _ in range(M)]
         intervals_border = [w_min for _ in range(M)]
+
+        if plot_w:
+            result[self.PARAM2] = [[intervals[i]] for i in range(M)]
 
         total_messages = 0
 
@@ -564,6 +576,8 @@ class MultipleAccess:
                 for _ in range(num_of_messages):
                     appear_time[i].append(time + random.random())
                     message_ready[i] = True
+                if plot_w:
+                    result[self.PARAM2][i].append(intervals[i])
             time += 1
             for i in range(M):
                 if intervals[i] > 0:
@@ -705,6 +719,27 @@ class MultipleAccess:
         return fig
 
     @staticmethod
+    def plot_w(list_results):
+        fig = None
+        for result in list_results:
+            fig, (ax1) = plt.subplots(1, 1)
+            plt.suptitle("M {} | Lambda {} | w_max {} | w_min {}".format(result.M, result.list_intense[0], result.p_max,
+                                                                         result.p_min))
+            ax1.set_xlabel('t')
+            ax1.set_ylabel('W')
+            list_legend = []
+            for i in range(result.M):
+                ax1.plot([t for t in range(len(result.param2[i]))], result.param2[i])
+                list_legend.append("client{}".format(i))
+            med = sum([sum(result.param2[i]) for i in range(result.M)]) / (result.M * len(result.param2[0]))
+            ax1.plot([t for t in range(len(result.param2[0]))], [med for _ in range(len(result.param2[0]))], '--')
+            list_legend.append("mean")
+            # ax1.set_xlim(0, 1.25)
+            # ax2.set_xlim(0, 1.25)
+            ax1.legend(list_legend)
+        return fig
+
+    @staticmethod
     def plot_channel_capture(list_results, total_time, title=''):
         fig, (ax1) = plt.subplots(1, 1)
         plt.suptitle(title)
@@ -718,28 +753,35 @@ class MultipleAccess:
 
 
 if __name__ == '__main__':
-    total_time = 100000
-    num_messages = 100000
-    simulation = MultipleAccess(total_time=total_time, num_messages=num_messages, debug=True)
+    total_time = 1000
+    simulation = MultipleAccess(total_time=total_time, num_messages=1000, debug=True)
+
+    # list_lambda = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    # list_lambda = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45,
+    #                0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1]
+    # list_lambda = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+    #
+    # list_M = [3]
+    #
+    # list_w_max = [8]
+    # list_w_min = [1]
 
     list_results = []
 
-    list_intense = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
-    list_p_max = [1]
-    list_p_min = [0.125]
-    list_M = [5]
+    # Вариант 7 Двоичная экспоненциальная отсрочка (Интервальный вариант)
 
-    list_results.extend(simulation.simulate_system(algorithm=AlgorithmEnum.BINARY_EXP,
-                                                   list_intense=list_intense,
-                                                   list_M=list_M,
-                                                   list_p_max=list_p_max,
-                                                   list_p_min=list_p_min))
-    # list_results.append(simulation.run_bin_exp_save_probs(intense=0.1, M=5, p_max=1, p_min=0.125))
-    # list_results.append(simulation.run_bin_exp_save_probs(intense=0.3, M=5, p_max=1, p_min=0.125))
-    # list_results.append(simulation.run_bin_exp_save_probs(intense=0.5, M=5, p_max=1, p_min=0.125))
-    # list_results.append(simulation.run_bin_exp_save_probs(intense=0.8, M=5, p_max=1, p_min=0.125))
+    # list_results.extend(
+    #     simulation.simulate_system(algorithm=AlgorithmEnum.INTERVAL_BINARY_EXP, list_intense=list_lambda, list_M=list_M,
+    #                                list_w_max=list_w_max, list_w_min=list_w_min)
+    # )
     #
-    # fig = MultipleAccess.plot_probs(list_results=list_results)
-    MultipleAccess.plot_results(list_results=list_results)
+    # MultipleAccess.plot_w(list_results)
+
+    list_results.append(simulation.run_bin_exp_interval_save_probs(intense=0.1, M=5, w_max=8, w_min=1))
+    list_results.append(simulation.run_bin_exp_interval_save_probs(intense=0.3, M=5, w_max=8, w_min=1))
+    list_results.append(simulation.run_bin_exp_interval_save_probs(intense=0.5, M=5, w_max=8, w_min=1))
+    list_results.append(simulation.run_bin_exp_interval_save_probs(intense=0.8, M=5, w_max=8, w_min=1))
+
+    fig = MultipleAccess.plot_w(list_results=list_results)
 
     plt.show()
