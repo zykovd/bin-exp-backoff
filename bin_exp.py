@@ -119,6 +119,7 @@ class AlgorithmEnum(Enum):
     ALOHA = 2
     ADAPTIVE_ALOHA = 3
     INTERVAL_BINARY_EXP = 4
+    ALOHA_VAR_INTENSE = 5
 
 
 class MultipleAccess:
@@ -210,6 +211,28 @@ class MultipleAccess:
         return list_results
 
     @logger
+    def run_system_with_variative_intense(self, list_intense_tuples, M, p_hh, p_hl, p_lh, p_ll, p_aloha):
+        list_clients, list_delay = [], []
+        list_p1, list_p2, list_p3, list_p4 = [], [], [], []
+
+        list_results = []
+        for intense_low, intense_high in list_intense_tuples:
+            res = self.run_aloha_with_variative_intense(M, intense_low, intense_high, p_hh, p_hl, p_lh, p_ll,
+                                                        p_aloha)
+            list_delay.append(res[self.DELAY])
+            list_clients.append(res[self.NUM_CLIENTS])
+            list_p1.append(res[self.PARAM1])
+            list_p2.append(res[self.PARAM2])
+            list_p3.append(res[self.PARAM3])
+            list_p4.append(res[self.PARAM4])
+        legend = "AlohaVarInt | hh {} | hl {} | lh {} | ll {} | p {} | M {}".format(p_hh, p_hl, p_lh, p_ll, p_aloha, M)
+        result = SimulationResult(algorithm=AlgorithmEnum.ALOHA_VAR_INTENSE, list_intense=list_intense_tuples,
+                                  list_clients=list_clients, list_delay=list_delay,
+                                  param1=list_p1, param2=list_p2, param3=list_p3, param4=list_p4, p_max=p_aloha, M=M,
+                                  legend=legend)
+        return result
+
+    @logger
     def run_bin_exp_save_probs(self, intense=0.85, M=4, p_max=1, p_min=0.015625):
         cprint("run_bin_exp_draw_prob | Lambda: {} | M: {}".format(intense, M), "cyan")
         temp_res = self.run_bin_exp(intense, M, p_max, p_min, True)
@@ -235,7 +258,8 @@ class MultipleAccess:
 
     def run_channel_capture(self, intense, M, p_max, p_min):
         list_results = [[] for _ in range(M + 1)]
-        result = {self.DELAY: 0, self.NUM_CLIENTS: 0, self.PARAM1: 0, self.PARAM2: 0, self.PARAM3: 0, self.PARAM4: 0}
+        result = {self.DELAY: 0, self.NUM_CLIENTS: 0, self.PARAM1: 0, self.PARAM2: 0, self.PARAM3: 0,
+                  self.PARAM4: 0}
         self.generate_helping_interval(intense=intense / M)
 
         _p_max = _p_min = 1 / M
@@ -358,7 +382,8 @@ class MultipleAccess:
         return res
 
     def run_adaptive_aloha(self, intense, M, p_max):
-        result = {self.DELAY: 0, self.NUM_CLIENTS: 0, self.PARAM1: 0, self.PARAM2: 0, self.PARAM3: 0, self.PARAM4: 0}
+        result = {self.DELAY: 0, self.NUM_CLIENTS: 0, self.PARAM1: 0, self.PARAM2: 0, self.PARAM3: 0,
+                  self.PARAM4: 0}
         # self.generate_helping_interval(intense=intense)
         self.generate_helping_interval(intense=intense / M)
         # print(self._helping_interval)
@@ -413,8 +438,83 @@ class MultipleAccess:
         result[self.PARAM1] = total_sends / time
         return result
 
+    def run_aloha_with_variative_intense(self, M, intense_low, intense_high, p_hh, p_hl, p_lh, p_ll, p_aloha):
+        if p_hh + p_hl != 1:
+            raise Exception("Probobaility high->high + Probobaility high->low must be equal 1")
+        if p_lh + p_ll != 1:
+            raise Exception("Probobaility low->high + Probobaility low->low must be equal 1")
+
+        result = {self.DELAY: 0, self.NUM_CLIENTS: 0, self.PARAM1: 0, self.PARAM2: 0, self.PARAM3: 0,
+                  self.PARAM4: 0}
+
+        time, total_sends, total_delay, clients = 0, 0, 0.0, 0
+        message_ready = [False for _ in range(M)]
+        appear_time = [[] for _ in range(M)]
+        is_high_intense = random.choice([False, True])
+
+        total_messages = 0
+
+        while time < self.total_time:
+
+            if is_high_intense:
+                if random.random() <= p_hl:
+                    is_high_intense = False
+                    intense = intense_low
+                else:
+                    is_high_intense = True
+                    intense = intense_high
+            else:
+                if random.random() <= p_lh:
+                    is_high_intense = True
+                    intense = intense_high
+                else:
+                    is_high_intense = False
+                    intense = intense_low
+
+            self.generate_helping_interval(intense=intense / M)
+
+            is_sending = [False for _ in range(M)]
+            for i in range(M):
+                if message_ready[i] and random.random() <= p_aloha:
+                    is_sending[i] = True
+            cur_clients = is_sending.count(True)
+            clients += cur_clients
+            if cur_clients == 1:
+                idx = is_sending.index(True)
+                total_sends += 1
+                delay = time + 1 - appear_time[idx].pop(0)
+                total_delay += delay
+                if len(appear_time[idx]) == 0:
+                    message_ready[idx] = False
+            for i in range(M):
+                if len(appear_time[i]) == 0:
+                    message_ready[i] = False
+                num_of_messages = self.generate_num_of_events(intense=intense / M)
+                total_messages += num_of_messages
+                for _ in range(num_of_messages):
+                    appear_time[i].append(time + random.random())
+                    message_ready[i] = True
+            time += 1
+
+        for i in range(M):
+            if len(appear_time[i]) > 0:
+                delay = time + 1 - appear_time[i].pop(0)
+                total_delay += delay
+                total_sends += 1
+
+        if self._DEBUG:
+            cprint('Remaining messages in queue =  {}'.format(sum([len(x) for x in appear_time])), 'red')
+            cprint('Generated messages / Time = {}'.format(total_messages / self.total_time), 'red')
+
+        if total_sends != 0:
+            result[self.DELAY] = total_delay / total_sends
+        result[self.NUM_CLIENTS] = clients / time
+        result[self.PARAM1] = total_sends / time
+        return result
+
     def run_aloha(self, intense, M, p_max):
-        result = {self.DELAY: 0, self.NUM_CLIENTS: 0, self.PARAM1: 0, self.PARAM2: 0, self.PARAM3: 0, self.PARAM4: 0}
+        result = {self.DELAY: 0, self.NUM_CLIENTS: 0, self.PARAM1: 0, self.PARAM2: 0, self.PARAM3: 0,
+                  self.PARAM4: 0}
         # self.generate_helping_interval(intense=intense)
         self.generate_helping_interval(intense=intense / M)
         # print(self._helping_interval)
@@ -467,7 +567,8 @@ class MultipleAccess:
         return result
 
     def run_bin_exp(self, intense, M, p_max, p_min, plot_probs=False):
-        result = {self.DELAY: 0, self.NUM_CLIENTS: 0, self.PARAM1: 0, self.PARAM2: 0, self.PARAM3: 0, self.PARAM4: 0}
+        result = {self.DELAY: 0, self.NUM_CLIENTS: 0, self.PARAM1: 0, self.PARAM2: 0, self.PARAM3: 0,
+                  self.PARAM4: 0}
         # self.generate_helping_interval(intense=intense)
         self.generate_helping_interval(intense=intense / M)
         # print(self._helping_interval)
@@ -530,7 +631,8 @@ class MultipleAccess:
         return result
 
     def run_interval_bin_exp(self, intense, M, w_max, w_min, plot_w=False):
-        result = {self.DELAY: 0, self.NUM_CLIENTS: 0, self.PARAM1: 0, self.PARAM2: 0, self.PARAM3: 0, self.PARAM4: 0}
+        result = {self.DELAY: 0, self.NUM_CLIENTS: 0, self.PARAM1: 0, self.PARAM2: 0, self.PARAM3: 0,
+                  self.PARAM4: 0}
         self.generate_helping_interval(intense=intense / M)
 
         time, total_sends, total_delay, clients = 0, 0, 0.0, 0
@@ -685,9 +787,15 @@ class MultipleAccess:
         ax3.set_ylabel('In/Out')
         list_legend = []
         for result in list_results:
-            ax1.plot(result.list_intense, result.list_clients)
-            ax2.plot(result.list_intense, result.list_delay)
-            ax3.plot(result.list_intense, result.param1)
+            if result.algorithm != AlgorithmEnum.ALOHA_VAR_INTENSE:
+                ax1.plot(result.list_intense, result.list_clients)
+                ax2.plot(result.list_intense, result.list_delay)
+                ax3.plot(result.list_intense, result.param1)
+            else:
+                list_intense = [(int_low + int_high) / 2 for int_low, int_high in result.list_intense]
+                ax1.plot(list_intense, result.list_clients)
+                ax2.plot(list_intense, result.list_delay)
+                ax3.plot(list_intense, result.param1)
             list_legend.append(result.legend)
         # ax1.set_xlim(0, 1.25)
         # ax2.set_xlim(0, 1.25)
@@ -702,8 +810,9 @@ class MultipleAccess:
         fig = None
         for result in list_results:
             fig, (ax1) = plt.subplots(1, 1)
-            plt.suptitle("M {} | Lambda {} | p_max {} | p_min {}".format(result.M, result.list_intense[0], result.p_max,
-                                                                         result.p_min))
+            plt.suptitle(
+                "M {} | Lambda {} | p_max {} | p_min {}".format(result.M, result.list_intense[0], result.p_max,
+                                                                result.p_min))
             ax1.set_xlabel('t')
             ax1.set_ylabel('P')
             list_legend = []
@@ -723,8 +832,9 @@ class MultipleAccess:
         fig = None
         for result in list_results:
             fig, (ax1) = plt.subplots(1, 1)
-            plt.suptitle("M {} | Lambda {} | w_max {} | w_min {}".format(result.M, result.list_intense[0], result.p_max,
-                                                                         result.p_min))
+            plt.suptitle(
+                "M {} | Lambda {} | w_max {} | w_min {}".format(result.M, result.list_intense[0], result.p_max,
+                                                                result.p_min))
             ax1.set_xlabel('t')
             ax1.set_ylabel('W')
             list_legend = []
@@ -734,7 +844,7 @@ class MultipleAccess:
             med = sum([sum(result.param2[i]) for i in range(result.M)]) / (result.M * len(result.param2[0]))
             ax1.plot([t for t in range(len(result.param2[0]))], [med for _ in range(len(result.param2[0]))], '--')
             list_legend.append("mean")
-            ax1.set_ylim(1, med+3)
+            ax1.set_ylim(1, med + 3)
             ax1.set_xlim(0, 1000)
             ax1.legend(list_legend)
         return fig
@@ -760,30 +870,28 @@ if __name__ == '__main__':
     # list_lambda = [0.01, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45,
     #                0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1]
     list_lambda = [0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1]
+    list_lambda_tuples = [(0.01, 0.1), (0.1, 0.2), (0.2, 0.3), (0.3, 0.4), (0.4, 0.5), (0.5, 0.6), (0.6, 0.7),
+                          (0.7, 0.8), (0.8, 0.9), (0.9, 1)]
 
-    list_M = [5]
+    p_hh = 0.6
+    p_hl = 0.4
+    p_lh = 0.4
+    p_ll = 0.6
 
-    list_w_max = [8, 1000]
-    list_w_min = [1]
+    M = 5
+    p_aloha = 1 / M
 
     list_results = []
-
-    # Вариант 7 Двоичная экспоненциальная отсрочка (Интервальный вариант)
 
     list_results.extend(
-        simulation.simulate_system(algorithm=AlgorithmEnum.INTERVAL_BINARY_EXP, list_intense=list_lambda, list_M=list_M,
-                                   list_w_max=list_w_max, list_w_min=list_w_min)
+        simulation.simulate_system(algorithm=AlgorithmEnum.ALOHA, list_intense=list_lambda,
+                                   list_M=[M], list_p_max=[p_aloha])
     )
 
+    list_results.append(
+        simulation.run_system_with_variative_intense(list_intense_tuples=list_lambda_tuples, M=M, p_aloha=p_aloha,
+                                                     p_hh=p_hh, p_hl=p_hl, p_lh=p_lh, p_ll=p_ll))
+
     MultipleAccess.plot_results(list_results)
-
-    list_results = []
-
-    list_results.append(simulation.run_bin_exp_interval_save_probs(intense=0.1, M=5, w_max=1000, w_min=1))
-    list_results.append(simulation.run_bin_exp_interval_save_probs(intense=0.3, M=5, w_max=1000, w_min=1))
-    list_results.append(simulation.run_bin_exp_interval_save_probs(intense=0.5, M=5, w_max=1000, w_min=1))
-    list_results.append(simulation.run_bin_exp_interval_save_probs(intense=0.8, M=5, w_max=1000, w_min=1))
-
-    fig = MultipleAccess.plot_w(list_results=list_results)
 
     plt.show()
