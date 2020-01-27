@@ -683,12 +683,12 @@ class MultipleAccess:
         ax2.set_ylabel('d')
         ax3.set_xlabel('Lambda')
         ax3.set_ylabel('In/Out')
-        list_legend = ['w_min = 1 | w_max = 8', 'w_min = 1 | w_max = 1000']
+        list_legend = []
         for result in list_results:
             ax1.plot(result.list_intense, result.list_clients)
             ax2.plot(result.list_intense, result.list_delay)
             ax3.plot(result.list_intense, result.param1)
-            # list_legend.append(result.legend)
+            list_legend.append(result.legend)
         # ax1.set_xlim(0, 1.25)
         # ax2.set_xlim(0, 1.25)
         ax2.set_ylim(0, 20)
@@ -723,9 +723,7 @@ class MultipleAccess:
         fig = None
         for result in list_results:
             fig, (ax1) = plt.subplots(1, 1)
-            # plt.suptitle("M {} | Lambda {} | w_max {} | w_min {}".format(result.M, result.list_intense[0], result.p_max,
-            #                                                              result.p_min))
-            plt.suptitle("M {} | Lambda {} | w_max {} | w_min {}".format(result.M, result.list_intense[0], 1000,
+            plt.suptitle("M {} | Lambda {} | w_max {} | w_min {}".format(result.M, result.list_intense[0], result.p_max,
                                                                          result.p_min))
             ax1.set_xlabel('t')
             ax1.set_ylabel('W')
@@ -765,7 +763,7 @@ if __name__ == '__main__':
 
     list_M = [5]
 
-    list_w_max = [8, 15]
+    list_w_max = [8, 1000]
     list_w_min = [1]
 
     list_results = []
