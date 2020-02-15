@@ -211,14 +211,15 @@ class MultipleAccess:
         return list_results
 
     @logger
-    def run_system_with_variative_intense(self, list_intense_tuples, M, p_hh, p_hl, p_lh, p_ll, p_aloha):
+    def run_system_with_variative_intense(self, list_intense_tuples, M, p_hh, p_hl, p_lh, p_ll, p_aloha,
+                                          variable_p_aloha=False):
         list_clients, list_delay = [], []
         list_p1, list_p2, list_p3, list_p4 = [], [], [], []
 
         list_results = []
         for intense_low, intense_high in list_intense_tuples:
             res = self.run_aloha_with_variative_intense(M, intense_low, intense_high, p_hh, p_hl, p_lh, p_ll,
-                                                        p_aloha)
+                                                        p_aloha, variable_p_aloha)
             list_delay.append(res[self.DELAY])
             list_clients.append(res[self.NUM_CLIENTS])
             list_p1.append(res[self.PARAM1])
@@ -228,7 +229,11 @@ class MultipleAccess:
             print(
                 "AlohaVarInt | lambda_low {} | lambda_high {} | p_hh {} | p_hl {} | p_lh {} | p_ll {} | p {} | M {} | d {}\n".format(
                     intense_low, intense_high, p_hh, p_hl, p_lh, p_ll, p_aloha, M, res[self.DELAY]))
-        legend = "AlohaVarInt | hh {} | hl {} | lh {} | ll {} | p {} | M {}".format(p_hh, p_hl, p_lh, p_ll, p_aloha, M)
+        if variable_p_aloha:
+            legend = "AlohaVarIntVarProb | hh {} | hl {} | lh {} | ll {} | M {}".format(p_hh, p_hl, p_lh, p_ll, M)
+        else:
+            legend = "AlohaVarInt | hh {} | hl {} | lh {} | ll {} | p {} | M {}".format(p_hh, p_hl, p_lh, p_ll, p_aloha,
+                                                                                        M)
         result = SimulationResult(algorithm=AlgorithmEnum.ALOHA_VAR_INTENSE, list_intense=list_intense_tuples,
                                   list_clients=list_clients, list_delay=list_delay,
                                   param1=list_p1, param2=list_p2, param3=list_p3, param4=list_p4, p_max=p_aloha, M=M,
@@ -441,7 +446,8 @@ class MultipleAccess:
         result[self.PARAM1] = total_sends / time
         return result
 
-    def run_aloha_with_variative_intense(self, M, intense_low, intense_high, p_hh, p_hl, p_lh, p_ll, p_aloha):
+    def run_aloha_with_variative_intense(self, M, intense_low, intense_high, p_hh, p_hl, p_lh, p_ll, p_aloha,
+                                         variable_p_aloha=False):
         if p_hh + p_hl != 1:
             raise Exception("Probobaility high->high + Probobaility high->low must be equal 1")
         if p_lh + p_ll != 1:
@@ -457,6 +463,12 @@ class MultipleAccess:
 
         total_messages = 0
         total_intense = 0
+
+        alg_prob = 0
+        if variable_p_aloha:
+            alg_prob = 1 / M
+        else:
+            alg_prob = p_aloha
 
         while time < self.total_time:
 
@@ -478,9 +490,19 @@ class MultipleAccess:
             total_intense += intense
             self.generate_helping_interval(intense=intense / M)
 
+            num_of_active_clients = 0
+            if variable_p_aloha:
+                for i in range(M):
+                    if message_ready[i]:
+                        num_of_active_clients += 1
+                if num_of_active_clients != 0:
+                    alg_prob = 1 / num_of_active_clients
+                else:
+                    alg_prob = p_aloha
+
             is_sending = [False for _ in range(M)]
             for i in range(M):
-                if message_ready[i] and random.random() <= p_aloha:
+                if message_ready[i] and random.random() <= alg_prob:
                     is_sending[i] = True
             cur_clients = is_sending.count(True)
             clients += cur_clients
@@ -929,7 +951,7 @@ if __name__ == '__main__':
     #
     # MultipleAccess.plot_results(list_results, "Different lambdas")
 
-    # ----- Different probabilities ----- #
+    # ----- Different probabilities and lambdas ----- #
 
     list_lambda_tuples1 = [(0.01, 0.1), (0.1, 0.2), (0.2, 0.3), (0.3, 0.4), (0.4, 0.5), (0.5, 0.6), (0.6, 0.7),
                            (0.7, 0.8), (0.8, 0.9), (0.9, 1), (1, 1.1)]
@@ -956,6 +978,19 @@ if __name__ == '__main__':
     list_results.append(
         simulation.run_system_with_variative_intense(list_intense_tuples=list_lambda_tuples3, M=M, p_aloha=p_aloha,
                                                      p_hh=p_hh3, p_hl=p_hl3, p_lh=p_lh3, p_ll=p_ll3))
+
+    list_results.append(
+        simulation.run_system_with_variative_intense(list_intense_tuples=list_lambda_tuples1, M=M, p_aloha=p_aloha,
+                                                     p_hh=p_hh1, p_hl=p_hl1, p_lh=p_lh1, p_ll=p_ll1,
+                                                     variable_p_aloha=True))
+    list_results.append(
+        simulation.run_system_with_variative_intense(list_intense_tuples=list_lambda_tuples2, M=M, p_aloha=p_aloha,
+                                                     p_hh=p_hh2, p_hl=p_hl2, p_lh=p_lh2, p_ll=p_ll2,
+                                                     variable_p_aloha=True))
+    list_results.append(
+        simulation.run_system_with_variative_intense(list_intense_tuples=list_lambda_tuples3, M=M, p_aloha=p_aloha,
+                                                     p_hh=p_hh3, p_hl=p_hl3, p_lh=p_lh3, p_ll=p_ll3,
+                                                     variable_p_aloha=True))
 
     MultipleAccess.plot_results(list_results, "Different probabilities")
 
